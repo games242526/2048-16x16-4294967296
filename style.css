@@ -675,3 +675,8 @@ body {
 :root[data-theme="dark"] body {
   background: var(--bg);
 }
+
+/* --accent-dark is too close to the dark --surface to read on. */
+:root[data-theme="dark"] .btn-info {
+  color: var(--link-color);
+}
