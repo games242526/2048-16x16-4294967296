@@ -188,6 +188,7 @@
 
   function startNewGame() {
     stopAutoPlay();
+    inputQueue.length = 0;
     stopRush();
     clearTimeout(pendingMoveTimeout);
     cells = emptyGrid();
@@ -346,7 +347,8 @@
   }
 
   function undo() {
-    if (isBusy || !lastSnapshot) return;
+    if (!lastSnapshot) return;
+    inputQueue.length = 0;
     stopAutoPlay();
     clearTimeout(pendingMoveTimeout);
     isBusy = false;
@@ -451,8 +453,32 @@
       render();
       isBusy = false;
       afterMove();
+      drainInputQueue();
     }, 110);
     return true;
+  }
+
+  // Key presses and swipes that land while tiles are still sliding are
+  // queued (a few deep) instead of dropped, so fast play never loses input.
+  const inputQueue = [];
+  const MAX_QUEUED_INPUTS = 3;
+
+  function requestMove(direction) {
+    if (isBusy) {
+      if (inputQueue.length < MAX_QUEUED_INPUTS) inputQueue.push(direction);
+      return;
+    }
+    move(direction, false);
+  }
+
+  function drainInputQueue() {
+    while (inputQueue.length && !isBusy) {
+      if (!overlayEl.hidden || !infoModalEl.hidden) {
+        inputQueue.length = 0;
+        return;
+      }
+      move(inputQueue.shift(), false);
+    }
   }
 
   function canMove() {
@@ -751,7 +777,7 @@
     const direction = KEY_MAP[e.key];
     if (!direction) return;
     e.preventDefault();
-    move(direction, false);
+    requestMove(direction);
   });
 
   // --- Touch / swipe input ---
@@ -795,9 +821,9 @@
       if (Math.max(absDx, absDy) < SWIPE_THRESHOLD) return;
 
       if (absDx > absDy) {
-        move(dx > 0 ? "right" : "left", false);
+        requestMove(dx > 0 ? "right" : "left");
       } else {
-        move(dy > 0 ? "down" : "up", false);
+        requestMove(dy > 0 ? "down" : "up");
       }
     },
     { passive: true }
